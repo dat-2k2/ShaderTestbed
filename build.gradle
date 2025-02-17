@@ -38,6 +38,29 @@ tasks.withType(JavaCompile) {
 }
 
 // Optional: Configure the main class if you have one
-// application {
-//     mainClass = 'org.src.Main'
-// }
+application {
+    mainClass = 'org.src.Main'
+}
+
+tasks.register('fatJar', Jar) {
+    archiveClassifier = 'fat'
+    
+    from sourceSets.main.output
+    
+    dependsOn configurations.runtimeClasspath
+    from {
+        configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
+    }
+    
+    manifest {
+        attributes 'Main-Class': application.mainClass
+    }
+    
+    // Exclude signature files from other JARs
+    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
+    
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// Make the jar task depend on fatJar
+jar.finalizedBy fatJar
