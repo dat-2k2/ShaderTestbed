@@ -1,8 +1,6 @@
 package org.src;
 
 import org.lwjgl.BufferUtils;
-import org.renderer.Shader;
-
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
