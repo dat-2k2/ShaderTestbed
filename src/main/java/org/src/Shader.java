@@ -1,10 +1,6 @@
 package org.src;
 
-import org.lwjgl.BufferUtils;
-
-import javax.print.DocFlavor;
 import java.io.IOException;
-import java.nio.FloatBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
