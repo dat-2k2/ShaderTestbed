@@ -39,14 +39,15 @@ tasks.withType(JavaCompile) {
 
 // Optional: Configure the main class if you have one
 application {
-    mainClass = 'org.src.Main'
+    mainClass = 'org.example.Main'
 }
 
 tasks.register('fatJar', Jar) {
     archiveClassifier = 'fat'
-    
+
     from sourceSets.main.output
-    
+    from sourceSets.main.resources
+
     dependsOn configurations.runtimeClasspath
     from {
         configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }

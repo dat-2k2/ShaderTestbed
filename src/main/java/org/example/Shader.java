@@ -1,4 +1,4 @@
-package org.src;
+package org.example;
 
 import java.io.IOException;
 import java.nio.file.Files;

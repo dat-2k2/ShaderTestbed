@@ -1,4 +1,4 @@
-package org.src;
+package org.example;
 
 
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or

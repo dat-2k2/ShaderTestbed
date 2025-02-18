@@ -1,4 +1,4 @@
-package org.src;
+package org.example;
 
 import org.lwjgl.BufferUtils;
 import java.nio.FloatBuffer;
@@ -39,7 +39,7 @@ public class Scene {
 
     public void init() {
 
-        defaultShader = new Shader("assets/shaders/default.glsl");
+        defaultShader = new Shader("src/main/resources/assets/shaders/default.glsl");
         defaultShader.compile();
         System.out.println("Compiled");
         // ============================================================

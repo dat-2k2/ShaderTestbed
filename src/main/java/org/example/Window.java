@@ -1,4 +1,4 @@
-package org.src;
+package org.example;
 
 import org.lwjgl.Version;
 import org.lwjgl.glfw.GLFWErrorCallback;
