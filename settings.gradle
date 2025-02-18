@@ -3,3 +3,5 @@
  */
 
 rootProject.name = 'ShaderTestbed'
+gradle.startParameter.setParallelProjectExecutionEnabled(true)
+gradle.startParameter.setMaxWorkerCount(3)
