@@ -32,6 +32,7 @@ public class Scene {
     private int vaoID, vboID, eboID;
 
     private Shader defaultShader;
+    private final long startTime = System.nanoTime();
 
     public Scene() {
 
@@ -78,8 +79,16 @@ public class Scene {
     }
 
     public void update() {
-        glEnable(GL_LIGHT0);
         defaultShader.use();
+        Window window = Window.get();
+        defaultShader.uploadVec3f("iResolution", window.getWidth(), window.getHeight(), 0.0f);
+        defaultShader.uploadFloat("iTime", (System.nanoTime() - startTime) / 1e9f);
+        defaultShader.uploadVec3f("uCameraPos", 2.0f, 0.0f, 0.0f);
+        defaultShader.uploadVec3f("uBaseColor", 0.7f, 0.0f, 0.0f);
+        defaultShader.uploadFloat("uRoughness", 0.5f);
+        defaultShader.uploadFloat("uMetallic", 0.0f);
+        defaultShader.uploadVec3f("uLightDir", 1.0f, 1.0f, 0.5f);
+        defaultShader.uploadFloat("uLightIntensity", 3.0f);
         // Bind the VAO that we're using
         glBindVertexArray(vaoID);
 

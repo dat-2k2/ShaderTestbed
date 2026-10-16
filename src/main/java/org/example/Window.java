@@ -23,7 +23,7 @@ public class Window {
     private Window() {
         this.width = 860;
         this.height = 640;
-        this.title = "Mario";
+        this.title = "Shader Testbed";
         r = 1;
         b = 1;
         g = 1;
@@ -48,6 +48,14 @@ public class Window {
         }
 
         return Window.window;
+    }
+
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
     }
 
     public void run() {
@@ -86,6 +94,17 @@ public class Window {
             throw new IllegalStateException("Failed to create the GLFW window.");
         }
         
+
+        // Track the real framebuffer size: the window starts maximized and is resizable
+        int[] fbWidth = new int[1], fbHeight = new int[1];
+        glfwGetFramebufferSize(glfwWindow, fbWidth, fbHeight);
+        this.width = fbWidth[0];
+        this.height = fbHeight[0];
+        glfwSetFramebufferSizeCallback(glfwWindow, (w, newWidth, newHeight) -> {
+            this.width = newWidth;
+            this.height = newHeight;
+            glViewport(0, 0, newWidth, newHeight);
+        });
 
         // Make the OpenGL context current
         glfwMakeContextCurrent(glfwWindow);

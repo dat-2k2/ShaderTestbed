@@ -11,14 +11,26 @@ void main()
 }
 
 #type fragment
+#version 330 core
 
 in vec3 fragCoord;
-const vec3 BASECOLOR = vec3(0.7, 0., 0.);
-const float ROUGHNESS = 0.5;
+out vec4 fragColor;
+
+// Set by the host (Scene.java on desktop, web/app.js in the browser)
+uniform vec3  iResolution;     // framebuffer size in pixels
+uniform float iTime;           // seconds since start
+uniform vec3  uCameraPos;      // camera position, looking at the origin
+uniform vec3  uBaseColor;      // linear base color
+uniform float uRoughness;      // perceptual roughness [0, 1]
+uniform float uMetallic;       // [0, 1]
+uniform vec3  uLightDir;       // direction towards the light (normalized by the shader)
+uniform float uLightIntensity;
 
 #define saturate(x) clamp(x, 0.0, 1.0)
 #define PI 3.14159265359
 #define IN_SPHERE 15.0
+#define MAX_STEPS 256
+#define MAX_DIST 400.0
 //------------------------------------------------------------------------------
 // Distance field functions
 //------------------------------------------------------------------------------
@@ -34,7 +46,6 @@ float opUnion(float d1, float d2) {
 
 float scene(in vec3 position) {
     float radius = 0.2;
-    int numSphere = 4;
     float sphere1 = sdSphere(position - vec3(0.0, 0.0, 0.0), radius);
     float sphere2 = sdSphere(position - vec3(-0.5, 0.0, 0.0), radius);
     float sphere3 = sdSphere(position - vec3(0.5, 0.0, -0.5), radius);
@@ -49,18 +60,16 @@ vec2 traceRay(in vec3 origin, in vec3 direction) {
     float t = 0.002;
     vec3 d = normalize(direction);
 
-    for (int i = 0; i < 10000; i++) {
+    for (int i = 0; i < MAX_STEPS; i++) {
         float hit = scene(origin + d * t);
-        if (hit < 0.002 || t > 400.0){
+        if (hit < 0.002) {
             material = IN_SPHERE;
             break;
         }
         t += hit;
-    }
-
-    //out of time
-    if (t > 400.0) {
-        material = -1.0;
+        if (t > MAX_DIST) {
+            break;
+        }
     }
 
     return vec2(t, material);
@@ -69,9 +78,9 @@ vec2 traceRay(in vec3 origin, in vec3 direction) {
 vec3 normal(in vec3 position) {
     vec3 epsilon = vec3(0.001, 0.0, 0.0);
     vec3 n = vec3(
-    scene(position + epsilon.xyy).x - scene(position - epsilon.xyy).x,
-    scene(position + epsilon.yxy).x - scene(position - epsilon.yxy).x,
-    scene(position + epsilon.yyx).x - scene(position - epsilon.yyx).x);
+    scene(position + epsilon.xyy) - scene(position - epsilon.xyy),
+    scene(position + epsilon.yxy) - scene(position - epsilon.yxy),
+    scene(position + epsilon.yyx) - scene(position - epsilon.yyx));
     return normalize(n);
 }
 
@@ -81,22 +90,23 @@ float pow5(float x) {
 }
 
 //Implement TR
-float D_GGX(float roughness, float NoH, const vec3 h) {
+float D_GGX(float alpha, float NoH) {
     //Trowbridge-Reitz
-    float alpha2 = roughness*roughness;
+    float alpha2 = alpha*alpha;
     float partialDenom = NoH*NoH*(alpha2-1.)+1.;
     return alpha2 / (PI * partialDenom * partialDenom);
 }
 
-float V_SmithGGXCorrelated(float roughness, float NoV, float NoL) {
-    // Disney's modification of Smith
+float V_SchlickGGX(float roughness, float NoV, float NoL) {
+    // Epic's Schlick-GGX geometry term G with k = (roughness + 1)^2 / 8, already
+    // divided by 4 NoV NoL. Folding the division in avoids 0/0 when NoL == 0.
     float k = (roughness + 1.)*(roughness + 1.)/8.;
-    float GGXV = NoV/(NoV*(1.-k)+k);
-    float GGXL = NoL/(NoL*(1.-k)+k);
-    return GGXV*GGXL;
+    float GGXV = NoV*(1.-k)+k;
+    float GGXL = NoL*(1.-k)+k;
+    return 1. / (4. * GGXV * GGXL);
 }
 
-vec3 F_Schlick(const vec3 f0, float VoH, float roughness) {
+vec3 F_Schlick(const vec3 f0, float VoH) {
     return f0 + (vec3(1.0) - f0) * pow5(1.0 - VoH);
 }
 
@@ -113,18 +123,18 @@ float Fd_Burley(float linearRoughness, float NoV, float NoL, float LoH) {
 }
 
 
-vec3 render(in vec3 origin, in vec3 direction, in vec3 l, out float distance) {
+vec3 render(in vec3 origin, in vec3 direction, in vec3 l, out float dist) {
     vec3 color = vec3(0.5);
 
     // (distance, material)
     vec2 hit = traceRay(origin, direction);
-    distance = hit.x;
+    dist = hit.x;
 
     float material = hit.y;
 
     // We've hit something in the scene
     if (material > 0.0) {
-        vec3 position = origin + distance * direction;
+        vec3 position = origin + dist * direction;
 
         vec3 v = normalize(-direction);
         vec3 n = normal(position);
@@ -135,26 +145,26 @@ vec3 render(in vec3 origin, in vec3 direction, in vec3 l, out float distance) {
         float NoH = saturate(dot(n, h));
         float LoH = saturate(dot(l, h));
 
-        //0.1,0.2,0.3,0.4,0.5
-        float linearRoughness = ROUGHNESS * ROUGHNESS;
-        vec3 diffuseColor = BASECOLOR.rgb;
+        // Clamp to avoid a singular D at roughness 0
+        float roughness = clamp(uRoughness, 0.045, 1.0);
+        float linearRoughness = roughness * roughness;
+        float metallic = saturate(uMetallic);
+        vec3 diffuseColor = (1.0 - metallic) * uBaseColor;
 
-        //calculate f0 from IOR and metalness
-        vec3 f0 = vec3(0.04);
+        // dielectrics reflect ~4%, metals tint the reflection with the base color
+        vec3 f0 = mix(vec3(0.04), uBaseColor, metallic);
 
         // specular BRDF
-        float D = D_GGX(linearRoughness, NoH, h);
-        float V = V_SmithGGXCorrelated(linearRoughness, NoV, NoL);
-        vec3  F = F_Schlick(f0, LoH, linearRoughness);
-        vec3 Fr = D * F * V /(4.*NoV*NoL);
+        float D = D_GGX(linearRoughness, NoH);
+        float V = V_SchlickGGX(roughness, NoV, NoL);
+        vec3  F = F_Schlick(f0, LoH);
+        vec3 Fr = D * V * F;
 
         // diffuse BRDF
         vec3 Fd = diffuseColor * Fd_Burley(linearRoughness, NoV, NoL, LoH);
 
-        color = Fd + Fr;
-    }
-    else{
-        color = vec3(0.5);
+        // rendering equation for one directional light, plus a small ambient term
+        color = (Fd + Fr) * NoL * uLightIntensity + 0.03 * uBaseColor;
     }
 
     return color;
@@ -174,30 +184,24 @@ mat3 setCamera(in vec3 origin, in vec3 target, float rotation) {
     return mat3(left, up, forward);
 }
 
-vec3 iResolution = vec3(860,640,0);
-out vec4 fragColor;
-
 void main() {
 
     // Normalized coordinates
-    vec2 p =  vec2(0.,0.3)+fragCoord.xy ;
+    vec2 p = fragCoord.xy;
     // Aspect ratio
-   p.x *= iResolution.x / iResolution.y;
+    p.x *= iResolution.x / iResolution.y;
 
     // Camera position and "look at"
-    vec3 origin = vec3(2., 0., 0.);
+    vec3 origin = uCameraPos;
     vec3 target = vec3(0.);
-
-    int lightX = 1;
-    int lightY = 2;
 
     mat3 toWorld = setCamera(origin, target, 0.);
     vec3 direction = toWorld * normalize(vec3(p.xy, 2.0));
 
     // Render scene
-    float distance;
-    vec3 color = render(origin, direction, vec3(3.,0.,0.), distance);
+    float dist;
+    vec3 color = render(origin, direction, normalize(uLightDir), dist);
 
-    color = OECF_sRGBFast(color);
+    color = OECF_sRGBFast(max(color, 0.0));
     fragColor = vec4(color, 1.0);
 }

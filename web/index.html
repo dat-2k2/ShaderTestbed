@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shader Testbed</title>
+  <meta name="description" content="Interactive WebGL2 port of ShaderTestbed: a raymarched scene shaded with Epic's microfacet BRDF.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="view" aria-label="Rendered scene. Drag to orbit, scroll or pinch to zoom."></canvas>
+
+  <div id="hud">
+    <span id="fps">-- fps</span>
+    <span class="hint">drag to orbit · scroll to zoom</span>
+  </div>
+
+  <button id="panel-toggle" type="button" aria-expanded="true" aria-controls="panel">Controls</button>
+
+  <aside id="panel">
+    <header>
+      <h1>Shader Testbed</h1>
+      <p>Raymarched spheres shaded with the Unreal Engine 4 microfacet model.
+        <a href="https://github.com/dat-2k2/ShaderTestbed">Source</a></p>
+    </header>
+
+    <section>
+      <h2>Material</h2>
+      <label class="row">Base color <input id="baseColor" type="color" value="#d90000"></label>
+      <label class="row">Roughness <output for="roughness"></output>
+        <input id="roughness" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+      <label class="row">Metallic <output for="metallic"></output>
+        <input id="metallic" type="range" min="0" max="1" step="0.01" value="0"></label>
+    </section>
+
+    <section>
+      <h2>Light</h2>
+      <label class="row">Azimuth <output for="lightAz"></output>
+        <input id="lightAz" type="range" min="-180" max="180" step="0.5" value="35"></label>
+      <label class="row">Elevation <output for="lightEl"></output>
+        <input id="lightEl" type="range" min="-89" max="89" step="1" value="40"></label>
+      <label class="row">Intensity <output for="lightIntensity"></output>
+        <input id="lightIntensity" type="range" min="0" max="10" step="0.1" value="3"></label>
+      <label class="check"><input id="animateLight" type="checkbox"> Orbit light</label>
+    </section>
+
+    <section>
+      <h2>View</h2>
+      <label class="row">Render scale <output for="renderScale"></output>
+        <input id="renderScale" type="range" min="0.25" max="1" step="0.05" value="1"></label>
+      <button id="resetView" type="button">Reset camera</button>
+    </section>
+
+    <section>
+      <h2>Fragment shader</h2>
+      <p class="note">Edit the GLSL and press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to recompile.
+        Uniforms: <code>iResolution</code>, <code>iTime</code>, <code>uCameraPos</code>,
+        <code>uBaseColor</code>, <code>uRoughness</code>, <code>uMetallic</code>,
+        <code>uLightDir</code>, <code>uLightIntensity</code>.</p>
+      <textarea id="source" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Fragment shader source"></textarea>
+      <div class="buttons">
+        <button id="compile" type="button" class="primary">Compile</button>
+        <button id="revert" type="button">Revert to default.glsl</button>
+      </div>
+      <pre id="log" role="status" aria-live="polite"></pre>
+    </section>
+  </aside>
+
+  <script src="app.js"></script>
+</body>
+</html>

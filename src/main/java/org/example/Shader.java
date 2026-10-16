@@ -3,6 +3,8 @@ package org.example;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.lwjgl.opengl.GL11.GL_FALSE;
 import static org.lwjgl.opengl.GL20.*;
@@ -23,30 +25,18 @@ public class Shader {
             String source = new String(Files.readAllBytes(Paths.get(filepath)));
             String[] splitString = source.split("(#type)( )+([a-zA-Z]+)");
 
-            // Find the first pattern after #type 'pattern'
-            int index = source.indexOf("#type") + 6;
-            int eol = source.indexOf("\r\n", index);
-            String firstPattern = source.substring(index, eol).trim();
-
-            // Find the second pattern after #type 'pattern'
-            index = source.indexOf("#type", eol) + 6;
-            eol = source.indexOf("\r\n", index);
-            String secondPattern = source.substring(index, eol).trim();
-
-            if (firstPattern.equals("vertex")) {
-                vertexSource = splitString[1];
-            } else if (firstPattern.equals("fragment")) {
-                fragmentSource = splitString[1];
-            } else {
-                throw new IOException("Unexpected token '" + firstPattern + "'");
-            }
-
-            if (secondPattern.equals("vertex")) {
-                vertexSource = splitString[2];
-            } else if (secondPattern.equals("fragment")) {
-                fragmentSource = splitString[2];
-            } else {
-                throw new IOException("Unexpected token '" + secondPattern + "'");
+            // Each '#type <pattern>' header owns the source chunk that follows it.
+            // Matching the headers directly works for both LF and CRLF files.
+            Matcher matcher = Pattern.compile("#type( )+([a-zA-Z]+)").matcher(source);
+            for (int i = 1; matcher.find(); i++) {
+                String pattern = matcher.group(2);
+                if (pattern.equals("vertex")) {
+                    vertexSource = splitString[i];
+                } else if (pattern.equals("fragment")) {
+                    fragmentSource = splitString[i];
+                } else {
+                    throw new IOException("Unexpected token '" + pattern + "'");
+                }
             }
         } catch(IOException e) {
             e.printStackTrace();
@@ -117,5 +107,17 @@ public class Shader {
     public void detach() {
         glUseProgram(0);
         beingUsed = false;
+    }
+
+    public void uploadFloat(String varName, float val) {
+        int varLocation = glGetUniformLocation(shaderProgramID, varName);
+        use();
+        glUniform1f(varLocation, val);
+    }
+
+    public void uploadVec3f(String varName, float x, float y, float z) {
+        int varLocation = glGetUniformLocation(shaderProgramID, varName);
+        use();
+        glUniform3f(varLocation, x, y, z);
     }
 }
