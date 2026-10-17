@@ -5,6 +5,8 @@ Shader Testbed for GLSL. Credit for Java code: https://github.com/codingminecraf
 
 ## Web demo
 
+The page is styled with the shared UI kit from the portfolio (`https://dat-2k2.github.io/kit/kit.css` and `kit.js`, light/dark, Geist); only the layout lives in this repo.
+
 An interactive WebGL2 version runs in the browser: **https://dat-2k2.github.io/shader-sandbox/**
 
 - It renders the same `src/main/resources/assets/shaders/default.glsl` as the desktop app (the `#version 330 core` header is rewritten to `#version 300 es` at load time).
