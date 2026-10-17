@@ -115,7 +115,7 @@ function useFragment(fragmentSrc) {
 }
 
 function setLog(kind, text) {
-  logEl.className = kind;
+  logEl.className = 'log ' + kind;
   logEl.textContent = text;
 }
 
@@ -151,10 +151,11 @@ const formatters = {
   lightAz: (v) => `${v}°`,
   lightEl: (v) => `${v}°`,
   renderScale: (v) => `${Math.round(v * 100)}%`,
+  baseColor: (v) => String(v).toUpperCase(),
 };
 
 function syncOutputs() {
-  for (const id of controls) {
+  for (const id of [...controls, 'baseColor']) {
     const input = $(id);
     const out = document.querySelector(`output[for="${id}"]`);
     if (out) out.textContent = (formatters[id] || ((v) => Number(v).toFixed(2)))(input.value);
@@ -199,15 +200,57 @@ sourceEl.addEventListener('keydown', (e) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Panel: floating card on desktop (Hide / Controls), bottom sheet on phones
+// with Material / Light / Shader tabs and a collapsed "peek" state.
+// ---------------------------------------------------------------------------
 const panel = $('panel');
-const toggle = $('panel-toggle');
-toggle.addEventListener('click', () => {
-  const hidden = panel.classList.toggle('hidden');
+const showBtn = $('panel-toggle');
+const phone = window.matchMedia('(max-width: 699px)');
+
+function setPanelHidden(hidden) {
+  panel.classList.toggle('hidden', hidden);
   document.body.classList.toggle('panel-hidden', hidden);
-  toggle.setAttribute('aria-expanded', String(!hidden));
-  toggle.textContent = hidden ? 'Controls' : 'Hide';
+  showBtn.setAttribute('aria-expanded', String(!hidden));
+  state.dirty = true;
+}
+showBtn.addEventListener('click', () => setPanelHidden(false));
+$('panel-hide').addEventListener('click', () => setPanelHidden(true));
+
+const tabs = [...panel.querySelectorAll('[role=tab]')];
+function showTab(name) {
+  tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === name)));
+  panel.querySelectorAll('.group, .panel-tools').forEach((g) => g.classList.toggle('is-active', g.dataset.tab === name));
+}
+tabs.forEach((t) => t.addEventListener('click', () => { showTab(t.dataset.tab); setPeek(false); }));
+showTab('material');
+
+function setPeek(peek) {
+  panel.classList.toggle('peek', peek);
+  $('sheet-handle').setAttribute('aria-expanded', String(!peek));
+}
+$('sheet-handle').addEventListener('click', () => setPeek(!panel.classList.contains('peek')));
+// swipe on the handle or the tab row
+let swipeY = null;
+const swipeZone = [$('sheet-handle'), panel.querySelector('.sheet-tabs')];
+swipeZone.forEach((z) => {
+  z.addEventListener('pointerdown', (e) => { swipeY = e.clientY; });
+  z.addEventListener('pointerup', (e) => {
+    if (swipeY === null) return;
+    const dy = e.clientY - swipeY;
+    if (dy < -24) setPeek(false);
+    else if (dy > 24) setPeek(true);
+    swipeY = null;
+  });
 });
-if (window.matchMedia('(max-width: 700px)').matches) toggle.textContent = 'Hide';
+const applyPhone = () => { if (phone.matches) { setPanelHidden(false); setPeek(true); } else { setPeek(false); } };
+phone.addEventListener('change', applyPhone);
+applyPhone();
+
+// Keyboard shortcut label matches the platform.
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform || '');
+document.querySelectorAll('[data-shortcut]').forEach((k) => { k.textContent = isMac ? '⌘ Enter' : 'Ctrl+Enter'; });
+document.querySelectorAll('[data-shortcut-short]').forEach((k) => { k.textContent = isMac ? '⌘↵' : 'Ctrl+↵'; });
 
 // Orbit camera: drag to rotate, wheel or two-finger pinch to zoom.
 const pointers = new Map();
@@ -298,9 +341,16 @@ function frame(now) {
   const light = sphericalToVec(Number($('lightAz').value) * Math.PI / 180,
     Number($('lightEl').value) * Math.PI / 180);
 
-  gl.viewport(0, 0, canvas.width, canvas.height);
+  // Centre the scene in the part of the canvas the panel does not cover:
+  // on desktop the floating panel takes the right 408 css px, on phones the
+  // collapsed sheet takes the bottom 128 css px. Over-sized viewports keep
+  // the whole canvas painted while shifting the centre.
+  const ratio = canvas.width / canvas.clientWidth;
+  const offX = !phone.matches && !panel.classList.contains('hidden') ? Math.round(204 * ratio) : 0;
+  const offY = phone.matches ? Math.round(64 * ratio) : 0;
+  gl.viewport(-2 * offX, 0, canvas.width + 2 * offX, canvas.height + 2 * offY);
   gl.useProgram(state.program);
-  gl.uniform3f(u.iResolution, canvas.width, canvas.height, 0);
+  gl.uniform3f(u.iResolution, canvas.width + 2 * offX, canvas.height + 2 * offY, 0);
   gl.uniform1f(u.iTime, (now - start) / 1000);
   gl.uniform3f(u.uCameraPos, cam[0], cam[1], cam[2]);
   gl.uniform3f(u.uBaseColor, ...hexToLinear($('baseColor').value));
